@@ -155,6 +155,10 @@ def gibbs_sampling(y, z, v, u, w, num_iterations, threshold=1e-6):
     r = sample_r(w)
     z = sample_z(y, z, r, gamma)
     
+    pi_init = pi
+    gamma_init = gamma
+    r_init = r
+    
     running_nmi = []
     running_perc_corr_class = []
     
@@ -187,7 +191,7 @@ def gibbs_sampling(y, z, v, u, w, num_iterations, threshold=1e-6):
         r = r_up
         z = z_up
         
-    return pi_up, gamma_up, r_up, running_nmi, running_perc_corr_class
+    return pi_up, gamma_up, r_up, running_nmi, running_perc_corr_class, pi_init, gamma_init, r_init
 
 
 ########################################################################################
@@ -284,12 +288,16 @@ def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run):
         u = np.ones((K, K))
         w = np.ones((N + 1, K))
 
-        pi_est, gamma_est, r_est, running_nmi, running_perc_corr_class = gibbs_sampling(y, z, v, u, w, num_iterations=15)
+        pi_est, gamma_est, r_est, running_nmi, running_perc_corr_class, pi_init, gamma_init, r_init = gibbs_sampling(y, z, v, u, w, num_iterations=50)
 
+        init_delta_pi = np.linalg.norm(pi_init - pi)
+        init_delta_gamma = np.linalg.norm(gamma_init - gamma, ord='fro')
+        init_delta_r = np.linalg.norm(r_init - r, ord='fro')
+    
         tot_nmi.append(running_nmi)
         tot_perc.append(running_perc_corr_class)
-        #tot_delta_gamma.append(delta_gamma)
-        #tot_delta_r.append(delta_r)
+        tot_delta_gamma.append(init_delta_gamma)
+        tot_delta_r.append(init_delta_r)
 
         print("##########################")
         print("Estimated values for the parameters")
@@ -311,20 +319,18 @@ def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run):
     print(tot_delta_r)
     """
 
-    #tot_delta_gamma=np.array(tot_delta_gamma)
-    #tot_delta_r=np.array(tot_delta_r)
-    #tot_dist=tot_delta_gamma+tot_delta_r
-#
-#
-    ## Plot different cases with the corrected function
-    #plot_nmi_vs_iterations(run_folder, tot_nmi, tot_dist, "NMI Vs Iteration Number for Multiple Runs", "Total Distance Measure")
-    #plot_nmi_vs_iterations(run_folder, tot_nmi, tot_delta_gamma, "NMI Vs Iteration Number for Multiple Runs", "Gamma Distance Measure")
-    #plot_nmi_vs_iterations(run_folder, tot_nmi, tot_delta_r, "NMI Vs Iteration Number for Multiple Runs", "R Distance Measure")
-#
-    #plot_nmi_vs_iterations(run_folder, tot_perc, tot_dist, "Percentage correct classified state Vs Iteration for Multiple Runs", "Total Distance Measure")
-    #plot_nmi_vs_iterations(run_folder, tot_perc, tot_delta_gamma, "Percentage correct classified state Vs Iteration for Multiple Runs", "Gamma Distance Measure")
-    #plot_nmi_vs_iterations(run_folder, tot_perc, tot_delta_r, "Percentage correct classified state Vs Iteration for Multiple Runs", "R Distance Measure")
-#
+    tot_delta_gamma=np.array(tot_delta_gamma)
+    tot_delta_r=np.array(tot_delta_r)
+    tot_dist=tot_delta_gamma+tot_delta_r
+
+    # Plot different cases with the corrected function
+    plot_nmi_vs_iterations(run_folder, tot_nmi, tot_dist, "NMI Vs Iteration Number for Multiple Runs", "Total Distance Measure")
+    plot_nmi_vs_iterations(run_folder, tot_nmi, tot_delta_gamma, "NMI Vs Iteration Number for Multiple Runs", "Gamma Distance Measure")
+    plot_nmi_vs_iterations(run_folder, tot_nmi, tot_delta_r, "NMI Vs Iteration Number for Multiple Runs", "R Distance Measure")
+
+    plot_nmi_vs_iterations(run_folder, tot_perc, tot_dist, "Percentage correct classified state Vs Iteration for Multiple Runs", "Total Distance Measure")
+    plot_nmi_vs_iterations(run_folder, tot_perc, tot_delta_gamma, "Percentage correct classified state Vs Iteration for Multiple Runs", "Gamma Distance Measure")
+    plot_nmi_vs_iterations(run_folder, tot_perc, tot_delta_r, "Percentage correct classified state Vs Iteration for Multiple Runs", "R Distance Measure")
 
     with open(os.path.join(run_folder, "run_parameters.txt"), "w") as f:
         f.write(type_run + '\n')
