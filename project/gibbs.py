@@ -149,11 +149,13 @@ def update_w(w, y, z):
 # GIBBS SAMPLING
 ########################################################################################
 
-def gibbs_sampling(y, z, v, u, w, num_iterations, threshold=1e-6):
+def gibbs_sampling(y, v, u, w, num_iterations, threshold=1e-6):
     pi = sample_pi(v)
     gamma = sample_gamma(u)
     r = sample_r(w)
-    z = sample_z(y, z, r, gamma)
+    K = len(v)
+    z0 = np.random.randint(1, K+1, K)
+    z = sample_z(y, z0, r, gamma)
     
     pi_init = pi
     gamma_init = gamma
@@ -267,6 +269,8 @@ def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run):
     print("Generated firings:", y)
     print("Generated states:", z)
     
+    # CHANGE Z
+    
     
     # Initialize everything
 
@@ -288,7 +292,7 @@ def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run):
         u = np.ones((K, K))
         w = np.ones((N + 1, K))
 
-        pi_est, gamma_est, r_est, running_nmi, running_perc_corr_class, pi_init, gamma_init, r_init = gibbs_sampling(y, z, v, u, w, num_iterations=50)
+        pi_est, gamma_est, r_est, running_nmi, running_perc_corr_class, pi_init, gamma_init, r_init = gibbs_sampling(y, v, u, w, num_iterations=50)
 
         init_delta_pi = np.linalg.norm(pi_init - pi)
         init_delta_gamma = np.linalg.norm(gamma_init - gamma, ord='fro')
@@ -357,7 +361,7 @@ def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run):
         f.write(f"Estimated Gamma: {gammas_est}\n")
         f.write(f"Estimated R: {rs_est}\n\n")
 
-        #f.write(f"Total NMI: {tot_nmi}\n")
-        #f.write(f"Total Percentage: {tot_perc}\n")
-        #f.write(f"Total Delta Gamma: {tot_delta_gamma}\n")
-        #f.write(f"Total Delta R: {tot_delta_r}\n")
+        f.write(f"Total NMI: {tot_nmi}\n")
+        f.write(f"Total Percentage: {tot_perc}\n")
+        f.write(f"Total Delta Gamma: {tot_delta_gamma}\n")
+        f.write(f"Total Delta R: {tot_delta_r}\n")
