@@ -93,7 +93,7 @@ def sample_z(y, z_prev, r, gamma):
     eta = np.zeros((T, K))
     
     for k in range(K):
-        eta[0, k] = r[y[0], k] * gamma[k, int(z_prev[1])]
+        eta[0, k] = r[y[0], k] * gamma[k, int(z_prev[1])] 
     
     eta[0, :] /= np.sum(eta[0, :])
     z_new[0] = np.random.choice(K, p=eta[0, :])
@@ -154,7 +154,7 @@ def gibbs_sampling(y, v, u, w, num_iterations, threshold=1e-6):
     gamma = sample_gamma(u)
     r = sample_r(w)
     K = len(v)
-    z0 = np.random.randint(1, K+1, K)
+    z0 = np.random.randint(0, K, K)
     z = sample_z(y, z0, r, gamma)
     
     pi_init = pi
@@ -355,6 +355,106 @@ def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run):
         f.write(f"Generated firings (y): {y[:100]}... (showing first 100 entries)\n")
         f.write(f"Generated states (z): {z[:100]}... (showing first 100 entries)\n\n")
 
+
+        f.write("Estimated parameters:\n")
+        f.write(f"Estimated Pi: {pis_est}\n")
+        f.write(f"Estimated Gamma: {gammas_est}\n")
+        f.write(f"Estimated R: {rs_est}\n\n")
+
+        f.write(f"Total NMI: {tot_nmi}\n")
+        f.write(f"Total Percentage: {tot_perc}\n")
+        f.write(f"Total Delta Gamma: {tot_delta_gamma}\n")
+        f.write(f"Total Delta R: {tot_delta_r}\n")
+
+
+# define a new run_simulation() function for analyzing real data
+
+def create_folder_real():
+    i = 1
+    while os.path.exists(f'run__real_{i}'):
+        i += 1
+
+    run_folder = f'run__real_{i}'
+    os.makedirs(run_folder)
+    return run_folder
+
+def run_simulation_real(y, T, N, K, seed, num_rep, type_run):
+
+    run_folder = create_folder_real()
+
+    # Initialize everything
+
+    pis_est = []
+    gammas_est = []
+    rs_est = []
+
+    tot_nmi=[]
+    tot_perc=[]
+    tot_delta_gamma=[]
+    tot_delta_r=[]
+
+    # Nrep is the number of attempts you want to do, the result depends on the random initialization
+    # of the matrices so we need multiple attemps
+
+    for i in range(num_rep):
+        print(f"Rep {i}...")
+        v = np.ones(K)
+        u = np.ones((K, K))
+        w = np.ones((N + 1, K))
+
+        pi_est, gamma_est, r_est, running_nmi, running_perc_corr_class, pi_init, gamma_init, r_init = gibbs_sampling(y, v, u, w, num_iterations=50)
+        
+        init_delta_pi = np.linalg.norm(pi_init - pi_est)
+        init_delta_gamma = np.linalg.norm(gamma_init - gamma_est, ord='fro')
+        init_delta_r = np.linalg.norm(r_init - r_est, ord='fro')
+    
+        tot_nmi.append(running_nmi)
+        tot_perc.append(running_perc_corr_class)
+        tot_delta_gamma.append(init_delta_gamma)
+        tot_delta_r.append(init_delta_r)
+
+        print("##########################")
+        print("Estimated values for the parameters")
+        print("Estimated Pi = ", pi_est)
+        print("Estimated Gamma = ", gamma_est)
+        print("Estimated R = ", r_est)
+
+        pis_est.append(pi_est)
+        gammas_est.append(gamma_est)
+        rs_est.append(r_est)
+
+        """
+        plt.plot(range(len(running_perc_corr_class)),running_perc_corr_class)
+        plt.title("Percentage of correctly classified states Vs Interation number")
+        plt.show()
+        """
+    """ 
+    print(tot_delta_gamma)
+    print(tot_delta_r)
+    """
+
+    tot_delta_gamma=np.array(tot_delta_gamma)
+    tot_delta_r=np.array(tot_delta_r)
+    tot_dist=tot_delta_gamma+tot_delta_r
+
+    # Plot different cases with the corrected function
+    plot_nmi_vs_iterations(run_folder, tot_nmi, tot_dist, "NMI Vs Iteration Number for Multiple Runs", "Total Distance Measure")
+    plot_nmi_vs_iterations(run_folder, tot_nmi, tot_delta_gamma, "NMI Vs Iteration Number for Multiple Runs", "Gamma Distance Measure")
+    plot_nmi_vs_iterations(run_folder, tot_nmi, tot_delta_r, "NMI Vs Iteration Number for Multiple Runs", "R Distance Measure")
+
+    plot_nmi_vs_iterations(run_folder, tot_perc, tot_dist, "Percentage correct classified state Vs Iteration for Multiple Runs", "Total Distance Measure")
+    plot_nmi_vs_iterations(run_folder, tot_perc, tot_delta_gamma, "Percentage correct classified state Vs Iteration for Multiple Runs", "Gamma Distance Measure")
+    plot_nmi_vs_iterations(run_folder, tot_perc, tot_delta_r, "Percentage correct classified state Vs Iteration for Multiple Runs", "R Distance Measure")
+
+    with open(os.path.join(run_folder, "run_parameters.txt"), "w") as f:
+        f.write(type_run + '\n')
+        f.write("=" * 50 + "\n\n")
+
+        f.write(f"N (neurons): {N}\n")
+        f.write(f"K (states): {K}\n")
+        f.write(f"T (time steps): {T}\n")
+        f.write(f"Seed: {seed}\n")
+        f.write(f"Number of repetitions: {num_rep}\n\n")
 
         f.write("Estimated parameters:\n")
         f.write(f"Estimated Pi: {pis_est}\n")
