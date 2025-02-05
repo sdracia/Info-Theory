@@ -6,6 +6,7 @@ K (states): 2
 T (time steps): 50000
 Seed: 1234
 Number of repetitions: 10
+Number of iterations: 100
 
 Initialization of parameters for HMM:
 Pi: [1 0]

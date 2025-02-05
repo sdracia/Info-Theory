@@ -256,7 +256,7 @@ def plot_nmi_vs_iterations(run_folder, tot_nmi, tot_dist, title, colorbar_label)
     plt.close()
 
 
-def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run):
+def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run, num_iter=100):
 
     run_folder = create_folder()
 
@@ -300,7 +300,7 @@ def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run):
         u = np.ones((K, K))
         w = np.ones((N + 1, K))
         
-        pi_est, gamma_est, r_est, running_nmi, running_perc_corr_class, pi_init, gamma_init, r_init = gibbs_sampling(y, v, u, w, num_iterations=100)
+        pi_est, gamma_est, r_est, running_nmi, running_perc_corr_class, pi_init, gamma_init, r_init = gibbs_sampling(y, v, u, w, num_iter)
 
         init_delta_pi = np.linalg.norm(pi_init - pi)
         init_delta_gamma = np.linalg.norm(gamma_init - gamma, ord='fro')
@@ -352,7 +352,8 @@ def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run):
         f.write(f"K (states): {K}\n")
         f.write(f"T (time steps): {T}\n")
         f.write(f"Seed: {seed}\n")
-        f.write(f"Number of repetitions: {num_rep}\n\n")
+        f.write(f"Number of repetitions: {num_rep}\n")
+        f.write(f"Number of iterations: {num_iter}\n\n")
 
         f.write("Initialization of parameters for HMM:\n")
         f.write(f"Pi: {pi}\n")
@@ -431,7 +432,7 @@ def run_simulation_real(y, T, N, K, seed, num_rep, type_run, num_iter=50):
         f.write(f"K (states): {K}\n")
         f.write(f"T (time steps): {T}\n")
         f.write(f"Seed: {seed}\n")
-        f.write(f"Number of repetitions: {num_rep}\n\n")
+        f.write(f"Number of repetitions: {num_rep}\n")
         f.write(f"Number of iterations: {num_iter}\n\n")
 
         f.write("Estimated parameters:\n")
