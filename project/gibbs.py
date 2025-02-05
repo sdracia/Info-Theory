@@ -154,8 +154,19 @@ def gibbs_sampling(y, v, u, w, num_iterations, threshold=1e-6):
     gamma = sample_gamma(u)
     r = sample_r(w)
     K = len(v)
-    z0 = np.random.randint(0, K, K)
-    z = sample_z(y, z0, r, gamma)
+
+    # new initialization method we're testing
+    z = []
+    for y_val in y:
+        if y_val == 0:
+            z.append(np.random.choice(np.arange(0, K)))  # Random if no neuron fired
+        else:
+            # Assign based on which state has the highest probability for neuron y
+            likely_state = np.argmax(r[y_val, :])
+            z.append(likely_state)
+    z = np.array(z)
+    
+    z = sample_z(y, z, r, gamma)
     
     pi_init = pi
     gamma_init = gamma
@@ -202,10 +213,10 @@ def gibbs_sampling(y, v, u, w, num_iterations, threshold=1e-6):
 
 def create_folder():
     i = 1
-    while os.path.exists(f'run_{i}'):
+    while os.path.exists(f'runs/run_{i}'):
         i += 1
 
-    run_folder = f'run_{i}'
+    run_folder = f'runs/run_{i}'
     os.makedirs(run_folder)
     return run_folder
     
@@ -245,9 +256,6 @@ def plot_nmi_vs_iterations(run_folder, tot_nmi, tot_dist, title, colorbar_label)
     plt.close()
 
 
-
-
-
 def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run):
 
     run_folder = create_folder()
@@ -269,9 +277,7 @@ def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run):
     print("Generated firings:", y)
     print("Generated states:", z)
     
-    # CHANGE Z
-    
-    
+
     # Initialize everything
 
     pis_est = []
@@ -285,14 +291,16 @@ def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run):
 
     # Nrep is the number of attempts you want to do, the result depends on the random initialization
     # of the matrices so we need multiple attemps
+    
+    
 
     for i in range(num_rep):
         print(f"Rep {i}...")
         v = np.ones(K)
         u = np.ones((K, K))
         w = np.ones((N + 1, K))
-
-        pi_est, gamma_est, r_est, running_nmi, running_perc_corr_class, pi_init, gamma_init, r_init = gibbs_sampling(y, v, u, w, num_iterations=50)
+        
+        pi_est, gamma_est, r_est, running_nmi, running_perc_corr_class, pi_init, gamma_init, r_init = gibbs_sampling(y, v, u, w, num_iterations=100)
 
         init_delta_pi = np.linalg.norm(pi_init - pi)
         init_delta_gamma = np.linalg.norm(gamma_init - gamma, ord='fro')
@@ -366,6 +374,56 @@ def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run):
         f.write(f"Total Delta Gamma: {tot_delta_gamma}\n")
         f.write(f"Total Delta R: {tot_delta_r}\n")
 
+########################################################################################
+# ANALYZING REAL DATA
+########################################################################################
+
+def gibbs_sampling_real(y, v, u, w, num_iterations, threshold=1e-6):
+    
+    pi = sample_pi(v)
+    gamma = sample_gamma(u)
+    r = sample_r(w)
+    K = len(v)
+    z0 = np.random.randint(0, K, K)
+    z = sample_z(y, z0, r, gamma)
+    
+    pi_init = pi
+    gamma_init = gamma
+    r_init = r
+    
+    running_nmi = []
+    running_perc_corr_class = []
+    
+    for iter in range(num_iterations):
+        if iter != 0 and iter%100==0:
+            print(f"Iteration {iter}...")
+        
+        v = update_v(v, z)
+        u = update_u(u, z)
+        w = update_w(w, y, z)
+        
+        pi_up = sample_pi(v)
+        gamma_up = sample_gamma(u)
+        r_up = sample_r(w)
+        
+        z_up = sample_z(y, z, r_up, gamma_up)
+        running_nmi.append(nmi(labels_true = z, labels_pred = z_up))
+        running_perc_corr_class.append(np.sum(z_up==z)/len(z)*100)
+        
+        delta_pi = np.linalg.norm(pi_up - pi)
+        delta_gamma = np.linalg.norm(gamma_up - gamma, ord='nuc')
+        delta_r = np.linalg.norm(r_up - r, ord='nuc')
+        
+        if delta_pi < threshold and delta_gamma < threshold and delta_r < threshold:
+            print(f"Converged at iteration {iter}")
+            break
+        
+        pi = pi_up
+        gamma = gamma_up
+        r = r_up
+        z = z_up
+        
+    return pi_up, gamma_up, r_up, running_nmi, running_perc_corr_class, pi_init, gamma_init, r_init
 
 # define a new run_simulation() function for analyzing real data
 
@@ -402,7 +460,7 @@ def run_simulation_real(y, T, N, K, seed, num_rep, type_run):
         u = np.ones((K, K))
         w = np.ones((N + 1, K))
 
-        pi_est, gamma_est, r_est, running_nmi, running_perc_corr_class, pi_init, gamma_init, r_init = gibbs_sampling(y, v, u, w, num_iterations=50)
+        pi_est, gamma_est, r_est, running_nmi, running_perc_corr_class, pi_init, gamma_init, r_init = gibbs_sampling_real(y, v, u, w, num_iterations=50)
         
         init_delta_pi = np.linalg.norm(pi_init - pi_est)
         init_delta_gamma = np.linalg.norm(gamma_init - gamma_est, ord='fro')
