@@ -291,8 +291,6 @@ def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run, num_iter=100)
 
     # Nrep is the number of attempts you want to do, the result depends on the random initialization
     # of the matrices so we need multiple attemps
-    
-    
 
     for i in range(num_rep):
         print(f"Rep {i}...")
@@ -397,6 +395,7 @@ def run_simulation_real(y, T, N, K, seed, num_rep, type_run, num_iter=50):
     pis_est = []
     gammas_est = []
     rs_est = []
+    nmis = []
 
     tot_nmi=[]
     tot_perc=[]
@@ -424,6 +423,11 @@ def run_simulation_real(y, T, N, K, seed, num_rep, type_run, num_iter=50):
         gammas_est.append(gamma_est)
         rs_est.append(r_est)
 
+        y_gen, z_gen = generate_hmm_data(T, N, K, pi_est, gamma_est, r_est)
+
+        nmi_value = nmi(labels_true=y, labels_pred=y_gen)
+        nmis.append(nmi_value)
+
     with open(os.path.join(run_folder, "run_parameters.txt"), "w") as f:
         f.write(type_run + '\n')
         f.write("=" * 50 + "\n\n")
@@ -439,3 +443,6 @@ def run_simulation_real(y, T, N, K, seed, num_rep, type_run, num_iter=50):
         f.write(f"Estimated Pi: {pis_est}\n")
         f.write(f"Estimated Gamma: {gammas_est}\n")
         f.write(f"Estimated R: {rs_est}\n\n")
+        
+        f.write(f"Nmi with generated data: {nmis}")
+        
