@@ -4,6 +4,9 @@ import time
 from tqdm import tqdm
 from sklearn.metrics import normalized_mutual_info_score as nmi
 import matplotlib.pyplot as plt
+import os
+
+
 
 def initialize_parameters(N, K, seed=None):
     #Initialize parameters randomly
@@ -112,7 +115,7 @@ def backward(y, gamma, r, T, K, epsilon=1e-10):
 
     return beta
 
-def e_step(y, pi, gamma, r, T, K):
+def e_step(y, z, pi, gamma, r, T, K):
     
     alpha = forward(y, pi, gamma, r, T, K)
     beta = backward(y, gamma, r, T, K)
@@ -208,7 +211,7 @@ def m_step(y, zeta, xi, N, K):
     
     return pi, gamma, r
 
-def em_algorithm(y, N, K, max_iter=100, tol=1e-6):
+def em_algorithm(y, z, pi, gamma, r, N, K, max_iter=100, tol=1e-6):
     
     T = len(y)
     pi_est, gamma_est, r_est = initialize_parameters(N, K)
@@ -238,16 +241,16 @@ def em_algorithm(y, N, K, max_iter=100, tol=1e-6):
     init_delta_gamma = np.linalg.norm(gamma_est - gamma, ord='fro')
     init_delta_r = np.linalg.norm(r_est - r, ord='fro')
     
-    print(f"Dist between starting pi and real = {init_delta_pi}")
-    print(f"Dist between starting gamma and real = {init_delta_gamma}")
-    print(f"Dist between starting r and real = {init_delta_r}")
+    # print(f"Dist between starting pi and real = {init_delta_pi}")
+    # print(f"Dist between starting gamma and real = {init_delta_gamma}")
+    # print(f"Dist between starting r and real = {init_delta_r}")
     
 
     for iteration in tqdm(range(max_iter),desc=f"Running EM algorithm with {max_iter} iterations"):
         
         #print("Running iteration: ",iteration)
         # E-step
-        zeta, xi, nmi, perc_corr_class = e_step(y, pi_est, gamma_est, r_est, T, K)
+        zeta, xi, nmi, perc_corr_class = e_step(y, z, pi_est, gamma_est, r_est, T, K)
         
         # Keep track of nmi and perc
         
@@ -260,10 +263,10 @@ def em_algorithm(y, N, K, max_iter=100, tol=1e-6):
         # M-step
         pi_updated, gamma_updated, r_updated = m_step(y, zeta, xi, N, K)
 
-        print("#################################")
-        print("pi_upd = ", pi_updated)
-        print("gamma_upd = ", gamma_updated)
-        print("r_upd = ", r_updated)
+        # print("#################################")
+        # print("pi_upd = ", pi_updated)
+        # print("gamma_upd = ", gamma_updated)
+        # print("r_upd = ", r_updated)
         
     
         # i compute the delta using the relative distance, and using the Frobenius norm
@@ -288,25 +291,62 @@ def em_algorithm(y, N, K, max_iter=100, tol=1e-6):
 
 
 
+def create_run_folder():
+    
+    i = 1
+    while os.path.exists(f'run_{i}'):
+        i += 1
+    
 
-N = 3  # neurons
-K = 2  # states
-T = 100000  # time steps
-seed = None #1234 
-num_rep = 10
-
-#input: initialization of the parameters for the HMM
-#pi, gamma, r = initialize_parameters(N, K, seed)
-
-pi=np.array([1,0])
-gamma=np.array([[0.9,0.1],[0.1,0.9]])
-r=np.array([[1,0],
-            [0,1],
-            [1,0],
-            [0,1]])
+    run_folder = f'run_{i}'
+    os.makedirs(run_folder)  
+    
+    return run_folder
 
 
-def run_algorithm(N, K, T, seed, num_rep, pi, gamma, r):
+
+# Function to plot the data of the nmi against the training steps, coloured based on a distance metric
+    
+def plot_nmi_vs_iterations(run_folder, tot_nmi, tot_dist, title, colorbar_label):
+    plt.figure(figsize=(10, 6))
+
+    # Normalize the distance values for the color mapping
+    
+    norm = plt.Normalize(vmin=np.min(tot_dist), vmax=np.max(tot_dist))
+    colormap = plt.cm.viridis
+
+    # Create a ScalarMappable to use for the colorbar (doesn't work otherwise)
+    
+    sm = plt.cm.ScalarMappable(cmap=colormap, norm=norm)
+    sm.set_array([])  # Required for compatibility with colorbar
+
+    # Loop through each run and plot it with color based on the required distance
+    
+    for i, (nmi_vals, dist) in enumerate(zip(tot_nmi, tot_dist)):
+        plt.plot(range(len(nmi_vals)), nmi_vals, label=f"Run {i+1}", color=colormap(norm(dist)), linewidth=2)
+
+    # Add colorbar explicitly associated with the correct figure
+    
+    cbar = plt.colorbar(sm, ax=plt.gca())  # Attach to current Axes
+    cbar.set_label(colorbar_label)  # Label for the colorbar
+
+    label_1 = title.split()[0]
+    label_2 = colorbar_label.split()[0]
+
+    plt.title(title)
+    plt.xlabel("Iteration Number")
+    plt.ylabel("NMI")
+    plt.legend()  # Show legend to distinguish different runs, it's not really useful because who cares the order
+    plt.savefig(f"{run_folder}/{label_1}_{label_2}.png")
+    plt.close()
+
+
+
+
+
+def run_simulation(N, K, T, seed, num_rep, pi, gamma, r, type_run):
+
+    run_folder = create_run_folder()
 
     # To make it simpler to set up one can just set 1 and 0 based on which we want to be active, and then they get normalized
     col_sums = r.sum(axis=0)
@@ -332,6 +372,10 @@ def run_algorithm(N, K, T, seed, num_rep, pi, gamma, r):
 
     # Initialize everything
 
+    pis_est = []
+    gammas_est = []
+    rs_est = []
+
     tot_nmi=[]
     tot_perc=[]
     tot_delta_gamma=[]
@@ -342,7 +386,7 @@ def run_algorithm(N, K, T, seed, num_rep, pi, gamma, r):
 
     for i in range(num_rep):
 
-        pi_est, gamma_est, r_est, running_nmi, running_perc_corr_class, delta_gamma, delta_r, delta_pi = em_algorithm(y, N, K, max_iter=15)
+        pi_est, gamma_est, r_est, running_nmi, running_perc_corr_class, delta_gamma, delta_r, delta_pi = em_algorithm(y, z, pi, gamma, r, N, K, max_iter=25)
 
         tot_nmi.append(running_nmi)
         tot_perc.append(running_perc_corr_class)
@@ -354,6 +398,10 @@ def run_algorithm(N, K, T, seed, num_rep, pi, gamma, r):
         print("Estimated Pi = ", pi_est)
         print("Estimated Gamma = ", gamma_est)
         print("Estimated R = ", r_est)
+
+        pis_est.append(pi_est)
+        gammas_est.append(gamma_est)
+        rs_est.append(r_est)
 
         """
         plt.plot(range(len(running_perc_corr_class)),running_perc_corr_class)
@@ -368,43 +416,47 @@ def run_algorithm(N, K, T, seed, num_rep, pi, gamma, r):
     tot_delta_gamma=np.array(tot_delta_gamma)
     tot_delta_r=np.array(tot_delta_r)
     tot_dist=tot_delta_gamma+tot_delta_r
+
+
+    # Plot different cases with the corrected function
+    plot_nmi_vs_iterations(run_folder, tot_nmi, tot_dist, "NMI Vs Iteration Number for Multiple Runs", "Total Distance Measure")
+    plot_nmi_vs_iterations(run_folder, tot_nmi, tot_delta_gamma, "NMI Vs Iteration Number for Multiple Runs", "Gamma Distance Measure")
+    plot_nmi_vs_iterations(run_folder, tot_nmi, tot_delta_r, "NMI Vs Iteration Number for Multiple Runs", "R Distance Measure")
+
+    plot_nmi_vs_iterations(run_folder, tot_perc, tot_dist, "Percentage correct classified state Vs Iteration for Multiple Runs", "Total Distance Measure")
+    plot_nmi_vs_iterations(run_folder, tot_perc, tot_delta_gamma, "Percentage correct classified state Vs Iteration for Multiple Runs", "Gamma Distance Measure")
+    plot_nmi_vs_iterations(run_folder, tot_perc, tot_delta_r, "Percentage correct classified state Vs Iteration for Multiple Runs", "R Distance Measure")
+
+
+    with open(os.path.join(run_folder, "run_parameters.txt"), "w") as f:
+        f.write(type_run + '\n')
+        f.write("=" * 50 + "\n\n")
+
+        f.write(f"N (neurons): {N}\n")
+        f.write(f"K (states): {K}\n")
+        f.write(f"T (time steps): {T}\n")
+        f.write(f"Seed: {seed}\n")
+        f.write(f"Number of repetitions: {num_rep}\n\n")
+
+        f.write("Initialization of parameters for HMM:\n")
+        f.write(f"Pi: {pi}\n")
+        f.write(f"Gamma: {gamma}\n")
+        f.write(f"R: {r}\n\n")
+
+        f.write("Generated data:\n")
+        f.write(f"Generated firings (y): {y[:100]}... (showing first 100 entries)\n")
+        f.write(f"Generated states (z): {z[:100]}... (showing first 100 entries)\n\n")
+
+
+        f.write("Estimated parameters:\n")
+        f.write(f"Estimated Pi: {pis_est}\n")
+        f.write(f"Estimated Gamma: {gammas_est}\n")
+        f.write(f"Estimated R: {rs_est}\n\n")
+
+        f.write(f"Total NMI: {tot_nmi}\n")
+        f.write(f"Total Percentage: {tot_perc}\n")
+        f.write(f"Total Delta Gamma: {tot_delta_gamma}\n")
+        f.write(f"Total Delta R: {tot_delta_r}\n")
+
     
-# Function to plot the data of the nmi against the training steps, coloured based on a distance metric
-    
-def plot_nmi_vs_iterations(tot_nmi, tot_dist, title, colorbar_label):
-    plt.figure(figsize=(10, 6))
-
-    # Normalize the distance values for the color mapping
-    
-    norm = plt.Normalize(vmin=np.min(tot_dist), vmax=np.max(tot_dist))
-    colormap = plt.cm.viridis
-
-    # Create a ScalarMappable to use for the colorbar (doesn't work otherwise)
-    
-    sm = plt.cm.ScalarMappable(cmap=colormap, norm=norm)
-    sm.set_array([])  # Required for compatibility with colorbar
-
-    # Loop through each run and plot it with color based on the required distance
-    
-    for i, (nmi_vals, dist) in enumerate(zip(tot_nmi, tot_dist)):
-        plt.plot(range(len(nmi_vals)), nmi_vals, label=f"Run {i+1}", color=colormap(norm(dist)), linewidth=2)
-
-    # Add colorbar explicitly associated with the correct figure
-    
-    cbar = plt.colorbar(sm, ax=plt.gca())  # Attach to current Axes
-    cbar.set_label(colorbar_label)  # Label for the colorbar
-
-    plt.title(title)
-    plt.xlabel("Iteration Number")
-    plt.ylabel("NMI")
-    plt.legend()  # Show legend to distinguish different runs, it's not really useful because who cares the order
-    plt.show()
-
-
-
-
-
-# Plot different cases with the corrected function
-plot_nmi_vs_iterations(tot_nmi, tot_dist, "NMI Vs Iteration Number for Multiple Runs", "Total Distance Measure")
-plot_nmi_vs_iterations(tot_nmi, tot_delta_gamma, "NMI Vs Iteration Number for Multiple Runs", "Gamma Distance Measure")
-plot_nmi_vs_iterations(tot_nmi, tot_delta_r, "NMI Vs Iteration Number for Multiple Runs", "R Distance Measure")
+    return pis_est, gammas_est, rs_est
