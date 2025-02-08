@@ -294,11 +294,11 @@ def em_algorithm(y, z, pi, gamma, r, N, K, max_iter=100, tol=1e-6):
 def create_run_folder():
     
     i = 1
-    while os.path.exists(f'run_{i}'):
+    while os.path.exists(f'synthetic_runs_hmm/run_{i}'):
         i += 1
     
 
-    run_folder = f'run_{i}'
+    run_folder = f'synthetic_runs_hmm/run_{i}'
     os.makedirs(run_folder)  
     
     return run_folder
