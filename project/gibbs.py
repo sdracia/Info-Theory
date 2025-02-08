@@ -213,10 +213,10 @@ def gibbs_sampling(y, v, u, w, num_iterations, threshold=1e-6):
 
 def create_folder():
     i = 1
-    while os.path.exists(f'runs/run_{i}'):
+    while os.path.exists(f'runs_synthetic_gibbs/run_{i}'):
         i += 1
 
-    run_folder = f'runs/run_{i}'
+    run_folder = f'runs_synthetic_gibbs/run_{i}'
     os.makedirs(run_folder)
     return run_folder
     
@@ -379,10 +379,10 @@ def run_simulation(T, N, K, seed, num_rep, pi, gamma, r, type_run, num_iter=100)
 
 def create_folder_real():
     i = 1
-    while os.path.exists(f'runs_real/run__real_{i}'):
+    while os.path.exists(f'runs_real_gibbs/run__real_{i}'):
         i += 1
 
-    run_folder = f'runs_real/run__real_{i}'
+    run_folder = f'runs_real_gibbs/run__real_{i}'
     os.makedirs(run_folder)
     return run_folder
 
